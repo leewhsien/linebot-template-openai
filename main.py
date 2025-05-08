@@ -83,12 +83,6 @@ def call_openai_chat_api(user_message):
 
     2. 月報遲交怎麼辦？
        - 敬請留意月報繳交時間，並盡快補上傳。若屢次逾期或未提交，恐影響後續合作安排，請務必配合。
-
-    3. 是否提供單次募款或募款專案？
-       - 目前我們專注於「定期定額」捐款，暫不提供單次募款或募款專案。如需更多資金募集建議，請聯繫客服。
-
-    4. 月報、單據、資料上傳有收到了嗎？
-       - 若資料有問題或未收到，我們會主動通知您，謝謝您的關心與協助！
     """
 
     response = openai.ChatCompletion.create(
@@ -142,6 +136,7 @@ async def handle_callback(request: Request):
             user_id = event.source.user_id
             user_message = event.message.text
 
+            # 在 Logs 中輸出用戶 ID 與訊息
             print(f"用戶 ID：{user_id}")
             print(f"收到訊息：{user_message}")
 
