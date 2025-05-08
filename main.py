@@ -14,7 +14,7 @@ import openai
 import os
 import sys
 import json
-
+import requests
 import aiohttp
 
 from fastapi import Request, FastAPI, HTTPException
@@ -23,12 +23,25 @@ from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-# Initialize OpenAI API
-import openai
-import os
+# 環境變數設定
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
+LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', None)
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
+LINE_USER_ID = os.getenv('LINE_USER_ID', None)  # 你的個人 LINE User ID
+
+# 初始化 LINE Bot
+app = FastAPI()
+session = aiohttp.ClientSession()
+async_http_client = AiohttpAsyncHttpClient(session)
+line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
+parser = WebhookParser(LINE_CHANNEL_SECRET)
+
+# LINE Notify URL
+NOTIFY_URL = "https://api.line.me/v2/bot/message/push"
 
 def call_openai_chat_api(user_message):
-    openai.api_key = os.getenv('OPENAI_API_KEY', None)
+    """ 呼叫 OpenAI API 進行回應 """
+    openai.api_key = OPENAI_API_KEY
 
     system_content = """
     你是一位客服專員，專門協助回答台灣一起夢想公益協會的問題。請根據以下資訊回覆使用者的問題：
@@ -76,30 +89,6 @@ def call_openai_chat_api(user_message):
 
     4. 月報、單據、資料上傳有收到了嗎？
        - 若資料有問題或未收到，我們會主動通知您，謝謝您的關心與協助！
-
-    5. 如何申請成為受助的微型社福機構？
-       - 請至合作申請頁面：https://510.org.tw/collaboration_apply 填寫申請表，並寄至客服信箱，我們將於7個工作日內回覆。
-
-    6. 如何捐款支持協會？
-       - 可透過線上捐款平台：https://510.org.tw/agency_applications 進行定期定額捐款，或聯繫客服了解其他捐款方式。
-
-    7. 如何申請一起夢想的服務？
-       - 微型社福機構可至合作申請頁面：https://510.org.tw/collaboration_apply 了解詳細資訊。
-
-    8. 志工如何報名？
-       - 志工招募頁面：https://510.org.tw/volunteer_applications
-
-    9. 如何取消或更改心靈沈靜活動名額？
-       - 請至活動頁面：https://510.org.tw/peace_mind 填寫取消或變更申請表。
-
-    10. 各地小聚如何報名？
-       - 報名連結：https://510.org.tw/event_applications
-
-    11. 後台操作問題、定期定額募款頁面修改：
-       - 詳細操作指引，請聯繫客服或參考提供的簡報。
-
-    📢 溫馨提醒：
-    - 若問題未能在上述資訊中獲得解決，請撥打客服專線或發送郵件至 service@510.org.tw，我們將盡快協助您。
     """
 
     response = openai.ChatCompletion.create(
@@ -112,23 +101,30 @@ def call_openai_chat_api(user_message):
 
     return response.choices[0].message['content']
 
+def notify_admin(user_id, message):
+    """通知管理員"""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
 
-# Get LINE credentials from environment variables
-channel_secret = os.getenv('LINE_CHANNEL_SECRET', None)
-channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-if channel_secret is None:
-    print('Specify LINE_CHANNEL_SECRET as environment variable.')
-    sys.exit(1)
-if channel_access_token is None:
-    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
-    sys.exit(1)
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    notification_message = (
+        f"🔔 收到未知問題通知\n"
+        f"時間：{timestamp}\n"
+        f"用戶 ID：{user_id}\n"
+        f"訊息內容：{message}"
+    )
 
-# Initialize FastAPI and LINE Bot API
-app = FastAPI()
-session = aiohttp.ClientSession()
-async_http_client = AiohttpAsyncHttpClient(session)
-line_bot_api = AsyncLineBotApi(channel_access_token, async_http_client)
-parser = WebhookParser(channel_secret)
+    data = {
+        "to": LINE_USER_ID,
+        "messages": [{"type": "text", "text": notification_message}]
+    }
+
+    response = requests.post(NOTIFY_URL, headers=headers, json=data)
+    if response.status_code != 200:
+        print(f"通知發送失敗：{response.status_code} - {response.text}")
 
 @app.post("/callback")
 async def handle_callback(request: Request):
@@ -142,24 +138,26 @@ async def handle_callback(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     for event in events:
-        if not isinstance(event, MessageEvent):
-            continue
-        if not isinstance(event.message, TextMessage):
-            continue
+        if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
+            user_id = event.source.user_id
+            user_message = event.message.text
 
-        print("收到訊息：", event.message.text)
+            # 呼叫 OpenAI API
+            response_message = call_openai_chat_api(user_message)
 
-        result = call_openai_chat_api(event.message.text)
+            # 若無法回答，發送通知
+            if "抱歉，我無法回答這個問題" in response_message:
+                notify_admin(user_id, user_message)
 
-        await line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=result)
-        )
+            # 回覆用戶
+            await line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=response_message)
+            )
 
     return 'OK'
 
-import uvicorn
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
+    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=port)
