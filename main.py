@@ -53,17 +53,68 @@ def call_openai_chat_api(user_message):
     客服時間：週一至週五，上午9:00至下午6:00
     客服信箱：service@510.org.tw
     門市地址：台北市忠孝東路四段220號11樓
+
+    📦 服務項目：
+    1. 募款支持：
+       - 定期定額捐款：https://510.org.tw/agency_applications
+       - 捐款查詢、捐款收據申請，請聯繫客服信箱或專線。
+
+    2. 後勤支持：
+       - 月報繳交與延遲處理：https://510.org.tw/agency_applications
+       - 資料上傳與補件通知。
+
+    3. 志工招募與活動報名：
+       - 志工招募：https://510.org.tw/volunteer_applications
+       - 心靈沈靜活動：https://510.org.tw/peace_mind
+       - 各地小聚報名：https://510.org.tw/event_applications
+
+    4. 社群連結：
+       - Facebook: https://www.facebook.com/510org/
+       - IG: https://www.instagram.com/510dream/
+       - YouTube: https://www.youtube.com/channel/UC123456789
+
+    🔍 常見問題 (FAQ)：
+
+    1. 為什麼這個月沒有收到定期定額款項？
+       - 如果單據已確實寄送，但一起夢想收到時間已超過每月10日，將無法趕上該月的帳務處理，款項將延至下月撥款。
+
+    2. 月報遲交怎麼辦？
+       - 敬請留意月報繳交時間，並盡快補上傳。若屢次逾期或未提交，恐影響後續合作安排，請務必配合。
+
+    3. 是否提供單次募款或募款專案？
+       - 目前我們專注於「定期定額」捐款，暫不提供單次募款或募款專案。如需更多資金募集建議，請聯繫客服。
+
+    4. 月報、單據、資料上傳有收到了嗎？
+       - 若資料有問題或未收到，我們會主動通知您，謝謝您的關心與協助！
+
+    5. 如何申請成為受助的微型社福機構？
+       - 請至合作申請頁面：https://510.org.tw/collaboration_apply 填寫申請表，並寄至客服信箱，我們將於7個工作日內回覆。
+
+    6. 如何捐款支持協會？
+       - 可透過線上捐款平台：https://510.org.tw/agency_applications 進行定期定額捐款，或聯繫客服了解其他捐款方式。
+
+    7. 如何申請一起夢想的服務？
+       - 微型社福機構可至合作申請頁面：https://510.org.tw/collaboration_apply 了解詳細資訊。
+
+    8. 志工如何報名？
+       - 志工招募頁面：https://510.org.tw/volunteer_applications
+
+    9. 如何取消或更改心靈沈靜活動名額？
+       - 請至活動頁面：https://510.org.tw/peace_mind 填寫取消或變更申請表。
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_message},
-        ]
-    )
-
-    return response.choices[0].message['content']
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_message},
+            ]
+        )
+        return response.choices[0].message['content']
+    except Exception as e:
+        print(f"OpenAI API Error: {e}")
+        return "抱歉，目前無法處理您的請求，請稍後再試。"
 
 def notify_admin(user_id, message):
     """通知管理員"""
@@ -72,11 +123,8 @@ def notify_admin(user_id, message):
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
     }
 
-    import datetime
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     notification_message = (
         f"🔔 收到未知問題通知\n"
-        f"時間：{timestamp}\n"
         f"用戶 ID：{user_id}\n"
         f"訊息內容：{message}"
     )
@@ -86,9 +134,7 @@ def notify_admin(user_id, message):
         "messages": [{"type": "text", "text": notification_message}]
     }
 
-    response = requests.post(NOTIFY_URL, headers=headers, json=data)
-    if response.status_code != 200:
-        print(f"通知發送失敗：{response.status_code} - {response.text}")
+    requests.post(NOTIFY_URL, headers=headers, json=data)
 
 @app.post("/callback")
 async def handle_callback(request: Request):
@@ -106,20 +152,21 @@ async def handle_callback(request: Request):
             user_id = event.source.user_id
             user_message = event.message.text
 
-            # 在 Logs 中輸出用戶 ID 與訊息
             print(f"用戶 ID：{user_id}")
             print(f"收到訊息：{user_message}")
 
-            # 回覆用戶，暫時用此訊息用於測試取得 user_id
-            reply_message = f"你的 User ID 是：{user_id}"
+            response_message = call_openai_chat_api(user_message)
+
+            if "抱歉" in response_message:
+                notify_admin(user_id, user_message)
+
             await line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=reply_message)
+                TextSendMessage(text=response_message)
             )
 
     return 'OK'
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
