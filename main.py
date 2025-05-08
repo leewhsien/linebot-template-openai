@@ -21,7 +21,7 @@ from fastapi import Request, FastAPI, HTTPException
 from linebot import AsyncLineBotApi, WebhookParser
 from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, Profile
 
 # 環境變數設定
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
@@ -90,17 +90,14 @@ def call_openai_chat_api(user_message):
     5. 如何申請成為受助的微型社福機構？
        - 請至合作申請頁面：https://510.org.tw/collaboration_apply 填寫申請表，並寄至客服信箱，我們將於7個工作日內回覆。
 
-    6. 如何捐款支持協會？
-       - 可透過線上捐款平台：https://510.org.tw/agency_applications 進行定期定額捐款，或聯繫客服了解其他捐款方式。
-
-    7. 如何申請一起夢想的服務？
-       - 微型社福機構可至合作申請頁面：https://510.org.tw/collaboration_apply 了解詳細資訊。
-
-    8. 志工如何報名？
+    6. 志工如何報名？
        - 志工招募頁面：https://510.org.tw/volunteer_applications
 
-    9. 如何取消或更改心靈沈靜活動名額？
+    7. 如何取消或更改心靈沈靜活動名額？
        - 請至活動頁面：https://510.org.tw/peace_mind 填寫取消或變更申請表。
+
+    8. 各地小聚如何報名？
+       - 報名連結：https://510.org.tw/event_applications
     """
 
     try:
@@ -116,7 +113,7 @@ def call_openai_chat_api(user_message):
         print(f"OpenAI API Error: {e}")
         return "抱歉，目前無法處理您的請求，請稍後再試。"
 
-def notify_admin(user_id, message):
+def notify_admin(user_id, display_name, message):
     """通知管理員"""
     headers = {
         "Content-Type": "application/json",
@@ -125,6 +122,7 @@ def notify_admin(user_id, message):
 
     notification_message = (
         f"🔔 收到未知問題通知\n"
+        f"用戶名稱：{display_name}\n"
         f"用戶 ID：{user_id}\n"
         f"訊息內容：{message}"
     )
@@ -135,6 +133,15 @@ def notify_admin(user_id, message):
     }
 
     requests.post(NOTIFY_URL, headers=headers, json=data)
+
+async def get_user_profile(user_id):
+    """取得用戶名稱"""
+    try:
+        profile = await line_bot_api.get_profile(user_id)
+        return profile.display_name
+    except Exception as e:
+        print(f"取得用戶名稱失敗：{e}")
+        return "未知用戶"
 
 @app.post("/callback")
 async def handle_callback(request: Request):
@@ -151,14 +158,16 @@ async def handle_callback(request: Request):
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
             user_id = event.source.user_id
             user_message = event.message.text
+            display_name = await get_user_profile(user_id)
 
+            print(f"用戶名稱：{display_name}")
             print(f"用戶 ID：{user_id}")
             print(f"收到訊息：{user_message}")
 
             response_message = call_openai_chat_api(user_message)
 
             if "抱歉" in response_message:
-                notify_admin(user_id, user_message)
+                notify_admin(user_id, display_name, user_message)
 
             await line_bot_api.reply_message(
                 event.reply_token,
