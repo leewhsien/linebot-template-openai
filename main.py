@@ -27,7 +27,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage, Profile
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', None)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-LINE_USER_ID = os.getenv('LINE_USER_ID', None)  # 你的個人 LINE User ID
+LINE_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"  # 直接設定你的 LINE User ID
 
 # 初始化 LINE Bot
 app = FastAPI()
@@ -82,22 +82,13 @@ def call_openai_chat_api(user_message):
        - 敬請留意月報繳交時間，並盡快補上傳。若屢次逾期或未提交，恐影響後續合作安排，請務必配合。
 
     3. 是否提供單次募款或募款專案？
-       - 目前我們專注於「定期定額」捐款，暫不提供單次募款或募款專案。如需更多資金募集建議，請聯繫客服。
+       - 目前我們專注於「定期定額」捐款，暫不提供單次募款或募款專案。
 
     4. 月報、單據、資料上傳有收到了嗎？
-       - 若資料有問題或未收到，我們會主動通知您，謝謝您的關心與協助！
+       - 若資料有問題或未收到，我們會主動通知您！
 
-    5. 如何申請成為受助的微型社福機構？
-       - 請至合作申請頁面：https://510.org.tw/collaboration_apply 填寫申請表，並寄至客服信箱，我們將於7個工作日內回覆。
-
-    6. 志工如何報名？
+    5. 志工如何報名？
        - 志工招募頁面：https://510.org.tw/volunteer_applications
-
-    7. 如何取消或更改心靈沈靜活動名額？
-       - 請至活動頁面：https://510.org.tw/peace_mind 填寫取消或變更申請表。
-
-    8. 各地小聚如何報名？
-       - 報名連結：https://510.org.tw/event_applications
     """
 
     try:
