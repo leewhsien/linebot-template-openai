@@ -142,6 +142,9 @@ async def handle_callback(request: Request):
             user_id = event.source.user_id
             user_message = event.message.text
 
+            print(f"用戶 ID：{user_id}")
+            print(f"收到訊息：{user_message}")
+
             # 呼叫 OpenAI API
             response_message = call_openai_chat_api(user_message)
 
