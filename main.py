@@ -53,36 +53,6 @@ def call_openai_chat_api(user_message):
     客服時間：週一至週五，上午9:00至下午6:00
     客服信箱：service@510.org.tw
     門市地址：台北市忠孝東路四段220號11樓
-
-    📌 服務簡介：
-    一起夢想是台灣首個專注服務「微型社福」的非營利組織，致力於支持全台正職人數6人以下的社會福利機構，協助其穩定運作，專心照顧弱勢族群。
-
-    📦 服務項目：
-    1. 募款支持：
-       - 定期定額捐款：https://510.org.tw/agency_applications
-       - 捐款查詢、捐款收據申請，請聯繫客服信箱或專線。
-
-    2. 後勤支持：
-       - 月報繳交與延遲處理：https://510.org.tw/agency_applications
-       - 資料上傳與補件通知。
-
-    3. 志工招募與活動報名：
-       - 志工招募：https://510.org.tw/volunteer_applications
-       - 心靈沈靜活動：https://510.org.tw/peace_mind
-       - 各地小聚報名：https://510.org.tw/event_applications
-
-    4. 社群連結：
-       - Facebook: https://www.facebook.com/510org/
-       - IG: https://www.instagram.com/510dream/
-       - YouTube: https://www.youtube.com/channel/UC123456789
-
-    🔍 常見問題 (FAQ)：
-
-    1. 為什麼這個月沒有收到定期定額款項？
-       - 如果單據已確實寄送，但一起夢想收到時間已超過每月10日，將無法趕上該月的帳務處理，款項將延至下月撥款。
-
-    2. 月報遲交怎麼辦？
-       - 敬請留意月報繳交時間，並盡快補上傳。若屢次逾期或未提交，恐影響後續合作安排，請務必配合。
     """
 
     response = openai.ChatCompletion.create(
@@ -140,17 +110,11 @@ async def handle_callback(request: Request):
             print(f"用戶 ID：{user_id}")
             print(f"收到訊息：{user_message}")
 
-            # 呼叫 OpenAI API
-            response_message = call_openai_chat_api(user_message)
-
-            # 若無法回答，發送通知
-            if "抱歉，我無法回答這個問題" in response_message:
-                notify_admin(user_id, user_message)
-
-            # 回覆用戶
+            # 回覆用戶，暫時用此訊息用於測試取得 user_id
+            reply_message = f"你的 User ID 是：{user_id}"
             await line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=response_message)
+                TextSendMessage(text=reply_message)
             )
 
     return 'OK'
