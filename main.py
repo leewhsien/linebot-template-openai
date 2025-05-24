@@ -27,7 +27,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', None)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-LINE_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"  # 直接設定你的 LINE User ID
+LINE_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"  # 管理者帳號
 
 # 初始化 LINE Bot
 app = FastAPI()
@@ -36,88 +36,47 @@ async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
+# 使用者身份記憶（簡化版）
+user_roles = {}
+user_message_count = {}
+
 # LINE Notify URL
 NOTIFY_URL = "https://api.line.me/v2/bot/message/push"
 
-def call_openai_chat_api(user_message):
-    """ 呼叫 OpenAI API 進行回應 """
-    openai.api_key = OPENAI_API_KEY
+# 問候語與身分詢問
+greeting_message = "您好，請問您是「捐款人」還是「微型社福」呢？我們會根據您的身份提供更合適的協助。"
 
-    system_content = """
-你是一位客服專員，專門協助回答台灣一起夢想公益協會的問題。請根據以下資訊回覆使用者的問題：
-
-公司名稱：台灣一起夢想公益協會（簡稱「一起夢想」）
-成立年份：2012年
-官網：https://510.org.tw/
-客服專線：(02)6604-2510
-客服時間：週一至週五，上午10:00至下午6:00
-客服信箱：service@510.org.tw
-門市地址：台北市忠孝東路四段220號11樓
-
-📦 常見問題 FAQ（協會上傳/後台操作類）：
-
-1. 檔案上傳到一半網頁當機怎麼辦？
-   - 請確認檔案大小未超過 2MB。若超過，可使用免費線上壓縮工具後再重新上傳。
-
-2. 財報資料無法提供給國稅局怎麼辦？
-   - 請提供理監事會議通過的財報相關資料，將由專人與您確認。
-
-3. 財報是整份無法拆分怎麼辦？
-   - 可使用免費線上服務拆分檔案，再重新上傳。
-
-4. 沒有正職人員無法提供勞保證明怎麼辦？
-   - 請下載「正職 0 人聲明文件」，加蓋協會大章後掃描上傳。
-
-📦 捐款人常見問題 FAQ（捐款與收據相關）：
-
-5. 為什麼這個月沒有收到款項？
-   - 撥款日為每月 15 日（遇假日順延）。可能原因為：(1) 一起夢想未於 9 號前收到收據；(2) 未於 10 號上傳款項使用報告。
-
-6. 如何查詢我的捐款資料？
-   - 可至徵信查詢區（https://510.org.tw/donation_information）輸入資料，系統會寄送紀錄至您提供的 email。
-
-7. 捐款期數怎麼設定？能提前終止嗎？
-   - 2023/10/11 前捐款：固定 36 期，到期自動終止。
-   - 之後捐款：依信用卡到期日為期。
-   - 若要變更，請填寫客服表單申請「變更總捐款期數」。
-
-8. 想調整每月捐款金額怎麼做？
-   - 請填寫客服表單（https://forms.gle/HkvmUzFGRwfVWs1n9）申請「變更捐款金額」。
-
-9. 更換信用卡怎麼做？
-   - 步驟一：填客服表單申請「變更扣款信用卡」，我們會終止原訂單。
-   - 步驟二：收到 email 連結後，請重新設定新的信用卡資訊。
-
-10. 為什麼授權失敗？
-   - 可能原因包括：信用卡失效、額度不足、金融卡餘額不足等。
-   - 可填表單申請「再次授權當月扣款」。
-
-11. 是否會提供捐款收據？
-   - 電子收據會寄至 email；定期定額於每月 1 號扣款當下寄出，單筆捐款則立即寄出。
-   - 年度收據於隔年 2 月前寄出；如未收到，可填寫表單申請補寄（電子或紙本）。
-
-12. 捐款如何報稅？
-   - 方法一：自行列印電子收據報稅。
-   - 方法二：由我們代為申報，請於每年 2/5 前填寫申請表單。
-
-13. 想取消定期定額捐款？
-   - 方式一：至徵信查詢區取得資料後於 email 中取消。
-   - 方式二：填寫客服表單申請取消。
-
-📦 其他常見服務：
-
-14. 志工招募資訊：https://510.org.tw/volunteer_applications
-15. 心靈沈靜活動報名：https://510.org.tw/peace_mind
-16. 小聚活動報名：https://510.org.tw/event_applications
-17. 申請合作成為微型社福：https://510.org.tw/collaboration_apply
-18. 申請定期定額捐款支持：https://510.org.tw/agency_applications
+# FAQ 內容（簡略）
+system_content_common = """
+你是一位客服專員，專門協助回答台灣一起夢想公益協會的問題。
+當你提到「客服表單」，請一律在回答中自然附上：https://forms.gle/HkvmUzFGRwfVWs1n9
+若使用者連續輸入三則以上訊息後仍未解決問題，請於回答後附註：
+「如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。」
+若你不確定使用者的身份是誰，請再次詢問他是「捐款人」還是「微型社福」。若問題與微型社福無關、或使用者尚未捐款，只是詢問，也請預設為「捐款人」。
 """
 
+system_content_donor = system_content_common + """
+📦 捐款人 FAQ（摘要）
+- 查詢捐款紀錄：https://510.org.tw/donation_information
+- 調整金額、信用卡、收據、取消捐款：填寫客服表單
+- 報稅／收據說明：提供電子收據或代為申報
+"""
+
+system_content_agency = system_content_common + """
+📦 微型社福 FAQ（摘要）
+- 檔案上傳錯誤、財報處理、無正職證明等上傳協助
+- 款項未撥常見原因
+- 志工、小聚、申請合作服務入口：https://510.org.tw/
+"""
+
+def call_openai_chat_api(user_message, role):
+    openai.api_key = OPENAI_API_KEY
+    content = system_content_donor if role == "捐款人" else system_content_agency
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": system_content},
+                {"role": "system", "content": content},
                 {"role": "user", "content": user_message},
             ]
         )
@@ -127,28 +86,23 @@ def call_openai_chat_api(user_message):
         return "抱歉，目前無法處理您的請求，請稍後再試。"
 
 def notify_admin(user_id, display_name, message):
-    """通知管理員"""
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
     }
-
     notification_message = (
         f"🔔 收到未知問題通知\n"
         f"用戶名稱：{display_name}\n"
         f"用戶 ID：{user_id}\n"
         f"訊息內容：{message}"
     )
-
     data = {
         "to": LINE_USER_ID,
         "messages": [{"type": "text", "text": notification_message}]
     }
-
     requests.post(NOTIFY_URL, headers=headers, json=data)
 
 async def get_user_profile(user_id):
-    """取得用戶名稱"""
     try:
         profile = await line_bot_api.get_profile(user_id)
         return profile.display_name
@@ -173,13 +127,42 @@ async def handle_callback(request: Request):
             user_message = event.message.text
             display_name = await get_user_profile(user_id)
 
-            print(f"用戶名稱：{display_name}")
-            print(f"用戶 ID：{user_id}")
-            print(f"收到訊息：{user_message}")
+            # 初次互動問身份
+            if user_id not in user_roles:
+                user_roles[user_id] = None
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=greeting_message)
+                )
+                return 'OK'
 
-            response_message = call_openai_chat_api(user_message)
+            # 身份輸入後記錄
+            if user_roles[user_id] is None:
+                if "捐款人" in user_message:
+                    user_roles[user_id] = "捐款人"
+                elif "微型社福" in user_message:
+                    user_roles[user_id] = "微型社福"
+                else:
+                    await line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text="請問您是「捐款人」還是「微型社福」呢？")
+                    )
+                    return 'OK'
 
-            if "抱歉" in response_message:
+            # 計數器累加
+            if user_id not in user_message_count:
+                user_message_count[user_id] = 1
+            else:
+                user_message_count[user_id] += 1
+
+            # 根據身份選擇 FAQ
+            role = user_roles.get(user_id, "捐款人")  # 預設為捐款人
+            response_message = call_openai_chat_api(user_message, role)
+
+            if user_message_count[user_id] >= 3:
+                response_message += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
+
+            if "需要幫忙" in user_message:
                 notify_admin(user_id, display_name, user_message)
 
             await line_bot_api.reply_message(
