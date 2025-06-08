@@ -44,7 +44,7 @@ user_message_count = {}
 NOTIFY_URL = "https://api.line.me/v2/bot/message/push"
 
 # 問候與請確認身份
-identity_prompt = "您好，請問您是「捐款人」還是「微型社福」呢？我們會根據您的身份提供更合適的協助。"
+identity_prompt = "您好，請問您是哪一間微型社福的夥伴呢？"
 
 # FAQ
 system_content_common = """
@@ -52,26 +52,34 @@ system_content_common = """
 當你提到「客服表單」，請一律在回答中自然附上：https://forms.gle/HkvmUzFGRwfVWs1n9
 若使用者連續輸入三則以上訊息後仍未解決問題，請於回答後附註：
 「如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。」
-若你不確定使用者的身份是誰，請再次詢問他是「捐款人」還是「微型社福」。若問題與微型社福無關、或使用者尚未捐款，只是詢問，也請預設為「捐款人」。
-"""
-
-system_content_donor = system_content_common + """
-\n📦 捐款人 FAQ：
-- 查詢捐款紀錄：https://510.org.tw/donation_information
-- 調整金額、信用卡、收據、取消捐款：填寫客服表單
-- 報稅／收據說明：提供電子收據或代為申報
 """
 
 system_content_agency = system_content_common + """
-\n📦 微型社福 FAQ：
-- 檔案上傳錯誤、財報處理、無正職證明等上傳協助
-- 款項未撥常見原因
-- 志工、小聚、申請合作服務入口：https://510.org.tw/
+📦 微型社福 FAQ（協會上傳/後台操作類）：
+1. 檔案上傳到一半網頁當機怎麼辦？
+   - 請確認檔案大小未超過 2MB。若超過，可使用免費線上壓縮工具後再重新上傳。
+2. 財報資料無法提供給國稅局怎麼辦？
+   - 請提供理監事會議通過的財報相關資料，將由專人與您確認。
+3. 財報是整份無法拆分怎麼辦？
+   - 可使用免費線上服務拆分檔案，再重新上傳。
+4. 沒有正職人員無法提供勞保證明怎麼辦？
+   - 請下載「正職 0 人聲明文件」，加蓋協會大章後掃描上傳。
+5. 為什麼這個月沒有收到款項？
+   - 撥款日為每月 15 日（遇假日順延）。可能原因為：
+     (1) 一起夢想未於 9 號前收到收據；
+     (2) 未於 10 號上傳款項使用報告。
+
+📦 微型社福可申請之服務：
+14. 志工招募資訊：https://510.org.tw/volunteer_applications
+15. 心靈沈靜活動報名：https://510.org.tw/peace_mind
+16. 小聚活動報名：https://510.org.tw/event_applications
+17. 微型社福申請合作頁面：https://510.org.tw/collaboration_apply
+18. 申請定期定額捐款支持：https://510.org.tw/agency_applications
 """
 
 def call_openai_chat_api(user_message, role):
     openai.api_key = OPENAI_API_KEY
-    content = system_content_donor if role == "捐款人" else system_content_agency
+    content = system_content_agency
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -122,27 +130,15 @@ async def callback(request: Request):
             display_name = await get_user_profile(user_id)
 
             if user_id not in user_roles:
-                user_roles[user_id] = None
+                user_roles[user_id] = "微型社福"
                 await line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text=identity_prompt)
                 )
                 return 'OK'
 
-            if user_roles[user_id] is None:
-                if "捐款人" in user_message:
-                    user_roles[user_id] = "捐款人"
-                elif "微型社福" in user_message:
-                    user_roles[user_id] = "微型社福"
-                else:
-                    await line_bot_api.reply_message(
-                        event.reply_token,
-                        TextSendMessage(text=identity_prompt)
-                    )
-                    return 'OK'
-
             user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
-            role = user_roles.get(user_id, "捐款人")
+            role = user_roles.get(user_id, "微型社福")
             response = call_openai_chat_api(user_message, role)
 
             if user_message_count[user_id] >= 3:
