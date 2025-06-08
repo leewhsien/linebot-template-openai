@@ -23,30 +23,30 @@ from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-# 環境變數設定
+# 環境設定
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', None)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-LINE_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"  # 管理者帳號
+LINE_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"  # 管理者 ID
 
-# 初始化 LINE Bot
+# 初始化
 app = FastAPI()
 session = aiohttp.ClientSession()
 async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
-# 使用者身份記憶（簡化版）
+# 用戶身份與答對累計
 user_roles = {}
 user_message_count = {}
 
-# LINE Notify URL
+# LINE 提醒 API
 NOTIFY_URL = "https://api.line.me/v2/bot/message/push"
 
-# 問候語與身分詢問
-greeting_message = "您好，請問您是「捐款人」還是「微型社福」呢？我們會根據您的身份提供更合適的協助。"
+# 問候與請確認身份
+identity_prompt = "您好，請問您是「捐款人」還是「微型社福」呢？我們會根據您的身份提供更合適的協助。"
 
-# FAQ 內容（簡略）
+# FAQ
 system_content_common = """
 你是一位客服專員，專門協助回答台灣一起夢想公益協會的問題。
 當你提到「客服表單」，請一律在回答中自然附上：https://forms.gle/HkvmUzFGRwfVWs1n9
@@ -56,14 +56,14 @@ system_content_common = """
 """
 
 system_content_donor = system_content_common + """
-📦 捐款人 FAQ（摘要）
+\n📦 捐款人 FAQ：
 - 查詢捐款紀錄：https://510.org.tw/donation_information
 - 調整金額、信用卡、收據、取消捐款：填寫客服表單
 - 報稅／收據說明：提供電子收據或代為申報
 """
 
 system_content_agency = system_content_common + """
-📦 微型社福 FAQ（摘要）
+\n📦 微型社福 FAQ：
 - 檔案上傳錯誤、財報處理、無正職證明等上傳協助
 - 款項未撥常見原因
 - 志工、小聚、申請合作服務入口：https://510.org.tw/
@@ -90,15 +90,9 @@ def notify_admin(user_id, display_name, message):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
     }
-    notification_message = (
-        f"🔔 收到未知問題通知\n"
-        f"用戶名稱：{display_name}\n"
-        f"用戶 ID：{user_id}\n"
-        f"訊息內容：{message}"
-    )
     data = {
         "to": LINE_USER_ID,
-        "messages": [{"type": "text", "text": notification_message}]
+        "messages": [{"type": "text", "text": f"🔔 收到未知問題通知\n用戶名稱：{display_name}\n用戶 ID：{user_id}\n訊息內容：{message}"}]
     }
     requests.post(NOTIFY_URL, headers=headers, json=data)
 
@@ -111,7 +105,7 @@ async def get_user_profile(user_id):
         return "未知用戶"
 
 @app.post("/callback")
-async def handle_callback(request: Request):
+async def callback(request: Request):
     signature = request.headers['X-Line-Signature']
     body = await request.body()
     body = body.decode()
@@ -124,19 +118,17 @@ async def handle_callback(request: Request):
     for event in events:
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
             user_id = event.source.user_id
-            user_message = event.message.text
+            user_message = event.message.text.strip()
             display_name = await get_user_profile(user_id)
 
-            # 初次互動問身份
             if user_id not in user_roles:
                 user_roles[user_id] = None
                 await line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text=greeting_message)
+                    TextSendMessage(text=identity_prompt)
                 )
                 return 'OK'
 
-            # 身份輸入後記錄
             if user_roles[user_id] is None:
                 if "捐款人" in user_message:
                     user_roles[user_id] = "捐款人"
@@ -145,29 +137,23 @@ async def handle_callback(request: Request):
                 else:
                     await line_bot_api.reply_message(
                         event.reply_token,
-                        TextSendMessage(text="請問您是「捐款人」還是「微型社福」呢？")
+                        TextSendMessage(text=identity_prompt)
                     )
                     return 'OK'
 
-            # 計數器累加
-            if user_id not in user_message_count:
-                user_message_count[user_id] = 1
-            else:
-                user_message_count[user_id] += 1
-
-            # 根據身份選擇 FAQ
-            role = user_roles.get(user_id, "捐款人")  # 預設為捐款人
-            response_message = call_openai_chat_api(user_message, role)
+            user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
+            role = user_roles.get(user_id, "捐款人")
+            response = call_openai_chat_api(user_message, role)
 
             if user_message_count[user_id] >= 3:
-                response_message += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
+                response += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
 
             if "需要幫忙" in user_message:
                 notify_admin(user_id, display_name, user_message)
 
             await line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=response_message)
+                TextSendMessage(text=response)
             )
 
     return 'OK'
