@@ -44,37 +44,43 @@ user_message_count = {}
 NOTIFY_URL = "https://api.line.me/v2/bot/message/push"
 
 # 問候與請確認身份
-identity_prompt = "您好，請問您是哪一間微型社福的夥伴呢？"
+identity_prompt = "您好，請問有什麼需要幫忙的地方嗎？"
 
 # FAQ
 system_content_common = """
 你是一位客服專員，專門協助回答台灣一起夢想公益協會的問題。
 當你提到「客服表單」，請一律在回答中自然附上：https://forms.gle/HkvmUzFGRwfVWs1n9
-若使用者連續輸入三則以上訊息後仍未解決問題，請於回答後附註：
-「如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。」
 """
 
 system_content_agency = system_content_common + """
-📦 微型社福 FAQ（協會上傳/後台操作類）：
-1. 檔案上傳到一半網頁當機怎麼辦？
-   - 請確認檔案大小未超過 2MB。若超過，可使用免費線上壓縮工具後再重新上傳。
-2. 財報資料無法提供給國稅局怎麼辦？
-   - 請提供理監事會議通過的財報相關資料，將由專人與您確認。
-3. 財報是整份無法拆分怎麼辦？
-   - 可使用免費線上服務拆分檔案，再重新上傳。
-4. 沒有正職人員無法提供勞保證明怎麼辦？
-   - 請下載「正職 0 人聲明文件」，加蓋協會大章後掃描上傳。
-5. 為什麼這個月沒有收到款項？
-   - 撥款日為每月 15 日（遇假日順延）。可能原因為：
-     (1) 一起夢想未於 9 號前收到收據；
-     (2) 未於 10 號上傳款項使用報告。
+📦 微型社福常見問題 FAQ：
 
-📦 微型社福可申請之服務：
-14. 志工招募資訊：https://510.org.tw/volunteer_applications
-15. 心靈沈靜活動報名：https://510.org.tw/peace_mind
-16. 小聚活動報名：https://510.org.tw/event_applications
-17. 微型社福申請合作頁面：https://510.org.tw/collaboration_apply
-18. 申請定期定額捐款支持：https://510.org.tw/agency_applications
+申請募款合作常見問題：
+1. 檔案上傳到一半，網頁一直顯示圈圈或當機，該怎麼辦？
+   - 請確認檔案大小未超過2MB，可用 https://www.ilovepdf.com/zh-tw/compress_pdf 壓縮。
+
+2. 沒有申報給國稅局的資料怎麼辦？
+   - 請提供理監事會議通過之財報資料，將由專人與您確認。
+
+3. 財報是一整份無法拆分檔案怎麼辦？
+   - 可用 https://www.ilovepdf.com/zh-tw/split_pdf 拆分後重新上傳。
+
+4. 沒有正職人員無法提供勞保證明怎麼辦？
+   - 請下載「正職 0 人聲明文件」(https://drive.google.com/file/d/19yVOO4kT0CT4TK_204HGqgQRM8cBroG0/view?usp=drive_link)，蓋章後掃描上傳。
+
+已募款合作單位常見問題：
+1. 上傳到一半，網頁顯示圈圈或當機？
+   - 檔案可能過大，請壓縮至 2MB 以下。
+
+2. 為什麼沒收到本月款項？
+   - 撥款日為每月15日，遇假日順延。常見原因：未於9日前收到收據，或未於10日前上傳使用報告。
+
+📦 微型社福可申請服務：
+- 志工招募：https://510.org.tw/volunteer_applications
+- 心靈活動：https://510.org.tw/peace_mind
+- 小聚報名：https://510.org.tw/event_applications
+- 合作申請：https://510.org.tw/collaboration_apply
+- 定期定額捐款申請：https://510.org.tw/agency_applications
 """
 
 def call_openai_chat_api(user_message, role):
@@ -134,6 +140,15 @@ async def callback(request: Request):
                 await line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text=identity_prompt)
+                )
+                return 'OK'
+
+            # 新增：辨識是否是詢問「上傳成功沒」的語意
+            check_keywords = ["有上傳成功嗎", "有成功上傳嗎", "幫我看一下有沒有傳好", "有沒有正確", "請幫我查看"]
+            if any(kw in user_message for kw in check_keywords):
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="請問您是哪一間微型社福的夥伴呢？我們會協助您到後台確認，再回覆您！")
                 )
                 return 'OK'
 
