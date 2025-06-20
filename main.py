@@ -6,7 +6,6 @@ import requests
 import aiohttp
 import urllib.parse
 import unicodedata
-import re
 
 from fastapi import Request, FastAPI, HTTPException
 from linebot import AsyncLineBotApi, WebhookParser
@@ -74,7 +73,7 @@ def call_openai_chat_api(user_message):
             ]
         )
         return response.choices[0].message['content']
-    except Exception as e:
+    except:
         return "目前無法處理您的請求，請稍後再試。"
 
 async def get_user_profile(user_id):
@@ -120,6 +119,8 @@ async def callback(request: Request):
             user_id = event.source.user_id
             text = event.message.text.strip()
 
+            user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
+
             if user_id not in user_roles:
                 user_roles[user_id] = "微型社福"
                 user_has_provided_info[user_id] = False
@@ -131,57 +132,63 @@ async def callback(request: Request):
             if not user_has_provided_info.get(user_id, False):
                 if message_looks_like_profile(text):
                     user_has_provided_info[user_id] = True
+                    # 抓單位名稱
+                    for line in text.splitlines():
+                        if "單位名稱" in line:
+                            user_orgname[user_id] = line.split("：")[-1].strip()
+                            break
+                    user_name = await get_user_profile(user_id)
                     await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=completion_message))
-                    display_name = await get_user_profile(user_id)
                     await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-                        text=f"有新用戶加入並完成建檔：\n用戶名稱：{display_name}\n用戶ID：{user_id}\n內容：\n{text}"))
+                        text=f"有新用戶加入並完成建檔：\n用戶名稱：{user_name}\n用戶ID：{user_id}\n內容：\n{text}"
+                    ))
                     return "OK"
                 else:
                     await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=onboarding_message))
                     return "OK"
 
             if text == "需要幫忙":
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="我已經通知專人協助，請耐心等候。"))
-                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(text=f"⚠️ 用戶 {user_id} 請求協助：\n「需要幫忙」"))
+                user_name = await get_user_profile(user_id)
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="我已經通知專人協助，請耐心等候。")
+                )
+                await line_bot_api.push_message(
+                    ADMIN_USER_ID,
+                    TextSendMessage(text=f"⚠️ 用戶 {user_name} 請求協助：\n「需要幫忙」")
+                )
                 return "OK"
 
             if text in faq_response_map:
                 await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=faq_response_map[text]))
                 return "OK"
 
-            # 若詢問查詢但尚未填寫單位名稱
-            if any(kw in text for kw in ["月報", "資料", "查詢"]) and not user_orgname.get(user_id):
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="請告訴我您是哪一個單位，我才能幫您查詢。"))
+            if "上傳" in text or "月報" in text or "資料" in text:
+                org = user_orgname.get(user_id)
+                if not org and user_has_provided_info.get(user_id, False):
+                    # 再次從填寫的資料找
+                    for line in text.splitlines():
+                        if "單位名稱" in line:
+                            org = line.split("：")[-1].strip()
+                            user_orgname[user_id] = org
+                            break
+                if org:
+                    await handle_status_check(user_id, org, event)
+                else:
+                    await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                        text="請告訴我您是哪一個單位，我才能幫您查詢。"
+                    ))
                 return "OK"
 
-            # 若已提供單位，直接查詢
-            if any(kw in text for kw in ["月報", "資料", "查詢"]) and user_orgname.get(user_id):
-                await handle_status_check(user_id, user_orgname[user_id], event)
-                return "OK"
-
-            # 回覆單位名稱
-            if text.startswith("我是") or text.startswith("我們是"):
-                org = text.replace("我是", "").replace("我們是", "").strip()
+            if text.startswith("我們是") or text.startswith("我是"):
+                org = text.replace("我們是", "").replace("我是", "").strip()
                 user_orgname[user_id] = org
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="收到單位名稱，請問有什麼需要幫忙的嗎？"))
+                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="感謝提供，請問有什麼需要幫忙的？"))
                 return "OK"
 
-            # 自動記憶若單純發送機構名稱
-            if normalize_org_name(text).endswith("協會") or normalize_org_name(text).endswith("基金會"):
-                user_orgname[user_id] = text.strip()
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="好的，我記下來了，請問接下來需要我幫您什麼？"))
-                return "OK"
-
-            # 未知訊息處理
-            user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
             reply = call_openai_chat_api(text)
-
             if user_message_count[user_id] >= 3:
                 reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
-                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-                    text=f"⚠️ 用戶 {user_id} 連續輸入無法識別內容：\n「{text}」"))
-
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     return "OK"
 
