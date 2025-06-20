@@ -74,7 +74,7 @@ def call_openai_chat_api(user_message):
             ]
         )
         return response.choices[0].message['content']
-    except Exception as e:
+    except Exception:
         return "目前無法處理您的請求，請稍後再試。"
 
 async def get_user_profile(user_id):
@@ -167,6 +167,8 @@ async def callback(request: Request):
             if user_message_count[user_id] >= 3:
                 reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
+                text=f"❓ 無法判斷用戶問題\nID：{user_id}\n訊息：「{text}」"))
     return "OK"
 
 if __name__ == "__main__":
