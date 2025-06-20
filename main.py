@@ -198,3 +198,8 @@ async def callback(request: Request):
 
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     return "OK"
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))  # Render 會給 PORT 環境變數
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    
