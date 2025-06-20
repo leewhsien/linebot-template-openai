@@ -43,7 +43,7 @@ completion_message = (
     "已收到您的資訊，並完成建檔\n"
     "很榮幸認識您與貴單位\n"
     "一起夢想支持微型社福的腳步持續邁進\n"
-    "期待未來多多交流、一同努力🤜🏻🤛🏻"
+    "期待未來多多交流、一起努力🤜🏻🤛🏻"
 )
 
 system_content = """
@@ -75,7 +75,7 @@ def call_openai_chat_api(user_message):
         )
         return response.choices[0].message['content']
     except Exception as e:
-        return None
+        return "目前無法處理您的請求，請稍後再試。"
 
 async def get_user_profile(user_id):
     try:
@@ -119,7 +119,6 @@ async def callback(request: Request):
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
             user_id = event.source.user_id
             text = event.message.text.strip()
-            display_name = await get_user_profile(user_id)
 
             if user_id not in user_roles:
                 user_roles[user_id] = "微型社福"
@@ -133,6 +132,7 @@ async def callback(request: Request):
                 if message_looks_like_profile(text):
                     user_has_provided_info[user_id] = True
                     await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=completion_message))
+                    display_name = await get_user_profile(user_id)
                     await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
                         text=f"有新用戶加入並完成建檔：\n用戶名稱：{display_name}\n用戶ID：{user_id}\n內容：\n{text}"))
                     return "OK"
@@ -142,41 +142,45 @@ async def callback(request: Request):
 
             if text == "需要幫忙":
                 await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="我已經通知專人協助，請耐心等候。"))
-                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(text=f"⚠️ 用戶 {display_name} ({user_id}) 請求協助：\n「需要幫忙」"))
+                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(text=f"⚠️ 用戶 {user_id} 請求協助：\n「需要幫忙」"))
                 return "OK"
 
             if text in faq_response_map:
                 await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=faq_response_map[text]))
                 return "OK"
 
-            if "上傳" in text or "月報" in text or "資料" in text:
-                org = user_orgname.get(user_id)
-                if org:
-                    await handle_status_check(user_id, org, event)
-                else:
-                    await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請告訴我您是哪一個單位，我才能幫您查詢。"))
+            # 若詢問查詢但尚未填寫單位名稱
+            if any(kw in text for kw in ["月報", "資料", "查詢"]) and not user_orgname.get(user_id):
+                await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="請告訴我您是哪一個單位，我才能幫您查詢。"))
                 return "OK"
 
-            if text.startswith("我們是") or text.startswith("我是"):
-                org = text.replace("我們是", "").replace("我是", "").strip()
+            # 若已提供單位，直接查詢
+            if any(kw in text for kw in ["月報", "資料", "查詢"]) and user_orgname.get(user_id):
+                await handle_status_check(user_id, user_orgname[user_id], event)
+                return "OK"
+
+            # 回覆單位名稱
+            if text.startswith("我是") or text.startswith("我們是"):
+                org = text.replace("我是", "").replace("我們是", "").strip()
                 user_orgname[user_id] = org
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="感謝提供，請問有什麼需要幫忙的？"))
+                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="收到單位名稱，請問有什麼需要幫忙的嗎？"))
                 return "OK"
 
+            # 自動記憶若單純發送機構名稱
+            if normalize_org_name(text).endswith("協會") or normalize_org_name(text).endswith("基金會"):
+                user_orgname[user_id] = text.strip()
+                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text="好的，我記下來了，請問接下來需要我幫您什麼？"))
+                return "OK"
+
+            # 未知訊息處理
             user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
             reply = call_openai_chat_api(text)
 
-            if not reply:
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="您的問題或許需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
-                ))
-                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-                    text=f"❗ 機器人無法回答用戶問題：\n用戶名稱：{display_name}\n用戶ID：{user_id}\n問題：{text}"
-                ))
-                return "OK"
-
             if user_message_count[user_id] >= 3:
                 reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
+                await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
+                    text=f"⚠️ 用戶 {user_id} 連續輸入無法識別內容：\n「{text}」"))
 
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     return "OK"
