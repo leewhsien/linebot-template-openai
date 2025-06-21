@@ -182,26 +182,38 @@ async def callback(request: Request):
                 return "OK"
 
             user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
-# 新增：如果用戶訊息偏離主題，主動通知管理員並回覆統一訊息
-if not any(k in text for k in faq_keywords_map.keys()) and \
-   "上傳" not in text and "資料" not in text and "月報" not in text and \
-   not text.startswith("我是") and not text.startswith("我們是"):
 
-    await line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(
-            text="對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
-        )
-    )
+            # 新增：如果用戶訊息偏離主題，主動通知管理員並回覆統一訊息
+            if not any(k in text for k in faq_keywords_map.keys()) and \
+                "上傳" not in text and "資料" not in text and "月報" not in text and \
+                not text.startswith("我是") and not text.startswith("我們是"):
 
-    await line_bot_api.push_message(
-        ADMIN_USER_ID,
-        TextSendMessage(
-            text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
-        )
-    )
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(
+                        text="對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
+                    )
+                )
+
+                await line_bot_api.push_message(
+                    ADMIN_USER_ID,
+                    TextSendMessage(
+                        text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
+                    )
+                )
+                return "OK"
+
+            # 如果不是偏離主題的，就進入 call_openai_chat_api
+            reply = call_openai_chat_api(text)
+
+            if user_message_count[user_id] >= 3:
+                reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
+
+            await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return "OK"
 
     return "OK"
+
 
 
     # 如果不是偏離主題的，就進入 call_openai_chat_api
