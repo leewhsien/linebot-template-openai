@@ -57,6 +57,8 @@ faq_keywords_map = {
     "月報": "📌 月報需在每月10號前上傳，如逾期，款項將於下個月15號一併撥款。",
     "收據": "📨 謝謝您，由於紙本單據眾多，無法一一幫忙查詢，請見諒；如收據有問題會另外通知。",
     "沒有收到款項": "📨 一起夢想每月撥款一次於每月15號（遇假日順延）；若未收到款項可能是因：\n(1)一起夢想未於10號前收到協會的捐款收據 \n(2)協會未於10號前上傳款項使用報告",
+    "撥款了嗎": "📨 一起夢想每月撥款一次於每月15號（遇假日順延）；若未收到款項可能是因：\n(1)一起夢想未於10號前收到協會的捐款收據 \n(2)協會未於10號前上傳款項使用報告",
+    "還沒有入帳": "📨 一起夢想每月撥款一次於每月15號（遇假日順延）；若未收到款項可能是因：\n(1)一起夢想未於10號前收到協會的捐款收據 \n(2)協會未於10號前上傳款項使用報告",
     "資料已上傳": "謝謝您，由於服務單位眾多，無法一一幫忙查詢，請見諒；如有任何問題會再另行通知，謝謝。",
     "募款沒有募滿": "📌 因為我們填補水庫近期較緊縮，因此填補優先針對：餘款+新募得款項低於目標金額的單位進行填補，希望可以盡量幫到所有單位~",
     "檔案上傳": "📁 請確認檔案大小是否超過 2MB。可使用 https://www.ilovepdf.com/zh-tw/compress_pdf 壓縮後上傳。",
@@ -64,6 +66,12 @@ faq_keywords_map = {
     "拆分": "📁 請用 https://www.ilovepdf.com/zh-tw/split_pdf 拆分上傳。",
     "勞保": "📄 請下載正職人員佐證用文件並上傳：https://drive.google.com/file/d/19yVO04kT0CT4TK_204HGqQRM8cBroG0/view?usp=drive_link"
 }
+
+def get_faq_reply(user_text):
+    for keyword, reply in faq_keywords_map.items():
+        if keyword in user_text:
+            return reply
+    return None
 
 def normalize_org_name(name):
     return unicodedata.normalize("NFKC", name.strip())
@@ -172,6 +180,14 @@ async def callback(request: Request):
                 ))
                 return "OK"
 
+
+            faq_reply = get_faq_reply(text)
+            if faq_reply:
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=faq_reply)
+                )
+                return "OK"
 
             if not user_has_provided_info.get(user_id, False):
                 if message_looks_like_profile(text):
