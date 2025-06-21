@@ -215,6 +215,8 @@ async def callback(request: Request):
     return "OK"
 
 
+async def handle_message(event, user_id, text):
+reply = ""
 if user_message_count[user_id] >= 3:
     reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
     await line_bot_api.reply_message(
