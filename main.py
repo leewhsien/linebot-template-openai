@@ -197,19 +197,17 @@ if not any(k in text for k in faq_keywords_map.keys()) and \
 
     return "OK"
 
-# 如果不是偏離主題的，就進入 call_openai_chat_api
-        reply = call_openai_chat_api(text)
+    # 如果不是偏離主題的，就進入 call_openai_chat_api
+    reply = call_openai_chat_api(text)
 
-        fallback_keywords = ["無法處理", "不太明白", "請稍後再試", "我不確定", "我無法協助您"]
-if any(k in reply for k in fallback_keywords):
-    reply = "對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題我可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
-    await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-        text=reply
-    ))
-    await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-        text=f"⚠️ 無法回答問題的用戶：\n用戶名稱：{profile_name}\n訊息內容：{text}"
-    ))
-    return "OK"
+    fallback_keywords = ["無法處理", "不太明白", "請稍後再試", "我不確定", "我無法協助您"]
+    if any(k in reply for k in fallback_keywords):
+        reply = "對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題我可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
+        await line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=reply)
+        )
+        return "OK"
 
         if user_message_count[user_id] >= 3:
             reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
