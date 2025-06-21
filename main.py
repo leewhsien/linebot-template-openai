@@ -212,13 +212,13 @@ if user_message_count[user_id] >= 3:
     
 
         # 新增：如用戶訊息偏離主題，主動通知管理員
-        if not any(k in text for k in faq_keywords_map.keys()) and "上傳" not in text and "資料" not in text and "月報" not in text and not text.startswith("我是") and not text.startswith("我們是"):
-            await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-                text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
-            ))
+if not any(k in text for k in faq_keywords_map.keys()) and "上傳" not in text and "資料" not in text and "月報" not in text and not text.startswith("我是") and not text.startswith("我們是"):
+    await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
+        text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
+    ))
 
-        await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-        return "OK"
+    await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+    return "OK"
 
 if __name__ == "__main__":
     import uvicorn
