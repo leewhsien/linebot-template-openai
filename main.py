@@ -69,16 +69,38 @@ def normalize_org_name(name):
     return unicodedata.normalize("NFKC", name.strip())
 
 def message_looks_like_profile(msg):
-    # 關鍵詞列表（擴充容錯性）
-    keywords = {
-        "unit": ["協會", "社區發展協會",],
-        "city": ["新北", "台北", "台中", "台南", "高雄", "基隆", "新竹", "嘉義", "花蓮", "台東", "南投", "宜蘭", "雲林", "彰化", "苗栗", "屏東", "澎湖", "金門", "連江"],
-        "contact": ["總幹事", "理事", "監事", "社工", "聯絡人", "電話", "職稱"],
-        "targets": ["弱勢孩童", "邊緣少年", "中年困境", "孤獨長者", "無助動物"],
-        "types": ["民生照顧", "教育陪伴", "醫療照護", "身心障礙", "理念推廣", "原住民", "新住民", "有物資需求", "有志工需求"]
+    status, info = parse_registration_info(msg)
+    return status == "success"
+    
+# 👉 建議放在這裡：message_looks_like_profile() 上面
+
+def parse_registration_info(text):
+    lines = text.strip().split("\n")
+    info = {
+        "unit": None,
+        "city": None,
+        "contact": None,
+        "targets": None,
+        "services": None
     }
 
-    return all(any(k in msg for k in group) for group in keywords.values())
+    for line in lines:
+        if not info["unit"] and "協會" in line:
+            info["unit"] = line.strip()
+        elif not info["city"] and any(city in line for city in ["新北", "台北", "台中", "台南", "高雄", "基隆", "新竹", "嘉義", "花蓮", "台東", "南投", "宜蘭", "雲林", "彰化", "苗栗", "屏東", "澎湖", "金門", "連江"]):
+            info["city"] = line.strip()
+        elif not info["contact"] and any(c in line for c in ["理事", "總幹事", "社工", "聯絡人", "電話"]):
+            info["contact"] = line.strip()
+        elif not info["targets"] and any(k in line for k in ["弱勢孩童", "邊緣少年", "中年困境", "孤獨長者", "無助動物"]):
+            info["targets"] = line.strip()
+        elif not info["services"] and any(k in line for k in ["民生照顧", "教育陪伴", "醫療照護", "身心障礙", "理念推廣", "原住民", "新住民", "有物資需求", "有志工需求"]):
+            info["services"] = line.strip()
+
+    if all(v is not None for v in info.values()):
+        return "success", info
+    else:
+        return "incomplete", info
+
 
 
 def call_openai_chat_api(user_message):
