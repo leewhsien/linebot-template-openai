@@ -52,17 +52,17 @@ system_content = """
 「如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。」
 """
 
-faq_response_map = {
-    "邀請我們": "🙏 非常感謝您熱情的邀請與好意！因為目前大家都在持續服務微型社福的夥伴們，實在不便抽身參與此一活動，也祝福活動一切順利圓滿，再次感謝您的邀請與用心。",
-    "月報會遲交": "📌 月報需在每月10號前上傳，如逾期，款項將於下個月15號一併撥款。",
-    "收據": "📨 由於紙本單據眾多，無法每個單位寄出，請見諒；如收據有問題會另外通知。\n📨 一起夢想將於每月15號（遇假日順延）撥款後，統一通知、款項將於下個月15號一併撥款。\n📨 一起夢想每月撥款一次於每月15號（遇假日順延）；若未收到款項可能是因：\n(1) 撥款尚未完成\n(2) 協會未於9號前收到捐款人的撥款收據。",
-    "沒有收到這個月款項": "📨 一起夢想每月撥款一次於每月15號，遇假日順延；若未收到款項可能是因：\n(1) 撥款尚未完成\n(2) 協會未於9號前收到捐款人的撥款收據。",
-    "資料已上傳": "📁 1. 判斷語意中上傳的是什麼資料，並查詢是否上傳。\n📁 2. 如無法判斷對方語意，再問對方上傳的是什麼。",
+faq_keywords_map = {
+    "邀請": "🙏 非常感謝您熱情的邀請與好意！因為目前大家都在持續服務微型社福的夥伴們，實在不便抽身參與此一活動，也祝福活動一切順利圓滿，再次感謝您的邀請與用心。",
+    "月報": "📌 月報需在每月10號前上傳，如逾期，款項將於下個月15號一併撥款。",
+    "收據": "📨 由於紙本單據眾多，無法每個單位寄出，請見諒；如收據有問題會另外通知。",
+    "沒有收到款項": "📨 一起夢想每月撥款一次於每月15號（遇假日順延）；若未收到款項可能是因：\n(1) 撥款尚未完成\n(2) 協會未於9號前收到捐款人的撥款收據。",
+    "資料已上傳": "由於服務單位眾多，無法一一幫忙查詢，請見諒；如有任何問題會再另行通知，謝謝。",
     "募款沒有募滿": "📌 因為我們採補水模式，回填填補優先對齊；餘款＋新募得款項優先填補下個月15號目標金額的單位進行填補，希望可以盡量幫到所有單位～",
     "檔案上傳": "📁 請確認檔案大小是否超過 2MB。可使用 https://www.ilovepdf.com/zh-tw/compress_pdf 壓縮後上傳。",
-    "財報資料無法提供給國稅局": "📌 請提供單位的財報資料，我們將有專人協助確認。",
-    "財報pdf無法拆分": "📁 請用 https://www.ilovepdf.com/zh-tw/split_pdf 拆分上傳。",
-    "職員無法提供勞保證明": "📄 請下載正職人員佐證用文件並上傳：https://drive.google.com/file/d/19yVO04kT0CT4TK_204HGqQRM8cBroG0/view?usp=drive_link"
+    "財報": "📌 請提供單位的財報資料，我們將有專人協助確認。",
+    "拆分": "📁 請用 https://www.ilovepdf.com/zh-tw/split_pdf 拆分上傳。",
+    "勞保": "📄 請下載正職人員佐證用文件並上傳：https://drive.google.com/file/d/19yVO04kT0CT4TK_204HGqQRM8cBroG0/view?usp=drive_link"
 }
 
 def normalize_org_name(name):
@@ -158,9 +158,10 @@ async def callback(request: Request):
                 ))
                 return "OK"
 
-            if text in faq_response_map:
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=faq_response_map[text]))
-                return "OK"
+            for keyword, reply_text in faq_keywords_map.items():
+                if keyword in text:
+                    await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                    return "OK"
 
             if "上傳" in text or "資料" in text or "月報" in text:
                 org = user_orgname.get(user_id)
@@ -198,8 +199,8 @@ async def callback(request: Request):
 
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     return "OK"
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 10000))  # Render 會給 PORT 環境變數
+    port = int(os.environ.get("PORT", 10000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
-    
