@@ -215,17 +215,6 @@ async def callback(request: Request):
     return "OK"
 
 
-async def handle_message(event, user_id, text):
-reply = ""
-if user_message_count[user_id] >= 3:
-    reply += "\n\n如果沒有解決到您的問題，請輸入『需要幫忙』，我將請專人回覆您。"
-    await line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=reply)
-    )
-    return "OK"
-
-
         # 新增：如用戶訊息偏離主題，主動通知管理員
 if not any(k in text for k in faq_keywords_map.keys()) and "上傳" not in text and "資料" not in text and "月報" not in text and not text.startswith("我是") and not text.startswith("我們是"):
     await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
