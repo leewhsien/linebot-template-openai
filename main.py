@@ -69,7 +69,9 @@ def normalize_org_name(name):
     return unicodedata.normalize("NFKC", name.strip())
 
 def message_looks_like_profile(msg):
-    return all(k in msg for k in ["單位名稱", "服務縣市", "聯絡人", "服務對象", "服務類別"])
+    keywords = ["單位名稱", "服務縣市", "聯絡人", "服務對象", "服務類別"]
+    count = sum(1 for k in keywords if k in msg)
+    return count >= 3
 
 def call_openai_chat_api(user_message):
     openai.api_key = OPENAI_API_KEY
