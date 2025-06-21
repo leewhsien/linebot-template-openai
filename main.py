@@ -206,6 +206,7 @@ if user_message_count[user_id] >= 3:
     await line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
+    )
     return "OK"
 
     
