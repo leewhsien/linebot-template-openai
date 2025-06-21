@@ -183,10 +183,7 @@ async def callback(request: Request):
 
             user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
 
-            # 新增：如果用戶訊息偏離主題，主動通知管理員並回覆統一訊息
-            if not any(k in text for k in faq_keywords_map.keys()) and \
-                "上傳" not in text and "資料" not in text and "月報" not in text and \
-                not text.startswith("我是") and not text.startswith("我們是"):
+            if not any(k in text for k in faq_keywords_map.keys()) and                 "上傳" not in text and "資料" not in text and "月報" not in text and                 not text.startswith("我是") and not text.startswith("我們是"):
 
                 await line_bot_api.reply_message(
                     event.reply_token,
@@ -203,7 +200,6 @@ async def callback(request: Request):
                 )
                 return "OK"
 
-            # 如果不是偏離主題的，就進入 call_openai_chat_api
             reply = call_openai_chat_api(text)
 
             if user_message_count[user_id] >= 3:
@@ -213,20 +209,6 @@ async def callback(request: Request):
             return "OK"
 
     return "OK"
-
-
-        # 新增：如用戶訊息偏離主題，主動通知管理員
-if not any(k in text for k in faq_keywords_map.keys()) and "上傳" not in text and "資料" not in text and "月報" not in text and not text.startswith("我是") and not text.startswith("我們是"):
-    await line_bot_api.push_message(ADMIN_USER_ID, TextSendMessage(
-        text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
-    ))
-
-    await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-    return "OK"
-    # 如果不是偏離主題的，就進入 call_openai_chat_api
-reply = call_openai_chat_api(text)
-
-fallback_keywords = ["無法處理", "不太明白", "請稍後再試", "我不確定", "我無法協助您"]
 
 if __name__ == "__main__":
     import uvicorn
