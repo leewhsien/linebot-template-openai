@@ -46,14 +46,18 @@ if manual_override.get(user_id, False):
         manual_override[user_id] = False
         print(f"[已解除] 使用者 {user_id} 機器人自動恢復回覆（逾時15分鐘）")
 
+else:
+    # 若使用者說了解、謝謝等 → 手動解除
+    if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
+        manual_override[user_id] = False
+        print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
+        await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+            text="很高興幫上忙，接下來有問題我會繼續協助您！"
+        ))
+        return "OK"
     else:
-        # 若使用者說了解、謝謝等 → 手動解除
-        if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
-            manual_override[user_id] = False
-            print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
-            await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text="很高興幫上忙，接下來有問題我會繼續協助您！"
-            ))
+        return "OK"  # 暫停機器人回覆
+
         else:
             return "OK"  # 暫停機器人回覆
 
@@ -220,6 +224,10 @@ async def callback(request: Request):
 
     for event in events:
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
+            # ✅ 跳過非私訊（例如群組、聊天室）
+            if event.source.type != "user":
+                continue
+            
             user_id = event.source.user_id
             text = event.message.text.strip()
             profile_name = await get_user_profile(user_id)
