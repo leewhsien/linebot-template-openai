@@ -126,7 +126,11 @@ def parse_registration_info(text):
             info["unit"] = line.strip()
         elif not info["city"] and any(city in line for city in ["新北", "台北", "台中", "台南", "高雄", "基隆", "新竹", "嘉義", "花蓮", "台東", "南投", "宜蘭", "雲林", "彰化", "苗栗", "屏東", "澎湖", "金門", "連江"]):
             info["city"] = line.strip()
-        elif not info["contact"] and any(c in line for c in ["理事", "總幹事", "社工", "志工", "牧師", "老師", "理事長", "秘書長"]):
+        elif not info["contact"] and (
+            any(c in line for c in ["理事", "總幹事", "社工", "志工", "牧師", "老師", "理事長", "秘書長", "主任", "負責人"]) or
+            re.search(r"\d{4,}", line) or
+            len(line.strip()) >= 5
+        ):
             info["contact"] = line.strip()
         elif not info["targets"] and any(k in line for k in ["弱勢孩童", "邊緣少年", "中年困境", "孤獨長者", "無助動物"]):
             info["targets"] = line.strip()
@@ -137,8 +141,6 @@ def parse_registration_info(text):
         return "success", info
     else:
         return "incomplete", info
-
-
 
 def call_openai_chat_api(user_message):
     openai.api_key = OPENAI_API_KEY
