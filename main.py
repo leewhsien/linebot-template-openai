@@ -47,7 +47,8 @@ if manual_override.get(user_id, False):
         print(f"[已解除] 使用者 {user_id} 機器人自動恢復回覆（逾時15分鐘）")
 
 from datetime import datetime, timedelta
-elif any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
+
+if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
     manual_override[user_id] = False 
     manual_override_time[user_id] = datetime.now()
     print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
@@ -55,7 +56,7 @@ elif any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到"
         event.reply_token,
         TextSendMessage(text="很高興幫上忙，接下來有問題我會繼續協助您！")
     )
-    return "OK"  # 暫停機器人回覆
+    return "OK" 
 
 
 onboarding_message = (
