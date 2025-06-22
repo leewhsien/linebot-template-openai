@@ -7,6 +7,7 @@ import aiohttp
 import urllib.parse
 import unicodedata
 import re
+from datetime import datetime, timedelta
 
 from fastapi import Request, FastAPI, HTTPException
 from linebot import AsyncLineBotApi, WebhookParser
@@ -29,6 +30,28 @@ user_roles = {}
 user_orgname = {}
 user_message_count = {}
 user_has_provided_info = {}
+manual_override = {}
+manual_override_time = {}
+
+user_id = event.source.user_id
+text = event.message.text.strip()
+
+# ✅ 若該用戶目前處於人工接管狀態
+if manual_override.get(user_id, False):
+    now = datetime.now()
+
+    # 自動解除：15分鐘後恢復機器人功能
+    if user_id in manual_override_time and now - manual_override_time[user_id] > timedelta(minutes=15):
+        manual_override[user_id] = False
+    else:
+        # 若使用者說了解、謝謝等 → 手動解除
+        if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
+            manual_override[user_id] = False
+            await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="很高興幫上忙，接下來有問題我會繼續協助您！"
+            ))
+        else:
+            return "OK"  # 暫停機器人回覆
 
 onboarding_message = (
     "請協助填寫以下資訊：\n"
