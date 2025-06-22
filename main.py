@@ -247,27 +247,7 @@ async def callback(request: Request):
                 if keyword in text:
                     await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
                     return "OK"
-
-            if "上傳" in text or "資料" in text or "月報" in text:
-                org = user_orgname.get(user_id)
-                if org:
-                    await handle_status_check(user_id, org, event)
-                else:
-                    await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                        text="請告訴我您是哪一個單位，我才能幫您查詢。"
-                    ))
-                return "OK"
-
-            if text.startswith("我們是") or text.startswith("我是"):
-                org = text.replace("我們是", "").replace("我是", "").strip()
-                user_orgname[user_id] = org
-                await line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="好的，我已記下您的單位，請問有什麼需要幫忙的？"
-                ))
-                return "OK"
-
-            user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
-
+                    
             if not any(k in text for k in faq_keywords_map.keys()) and                 "上傳" not in text and "資料" not in text and "月報" not in text and                 not text.startswith("我是") and not text.startswith("我們是"):
 
                 await line_bot_api.reply_message(
@@ -285,6 +265,43 @@ async def callback(request: Request):
                 )
                 return "OK"
 
+            if "上傳" in text or "資料" in text or "月報" in text:
+                org = user_orgname.get(user_id)
+                if org:
+                    await handle_status_check(user_id, org, event)
+                else:
+                    await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                        text="請告訴我您是哪一個單位，我才能幫您查詢。"
+                    ))
+                return "OK"
+                
+            if not any(k in text for k in faq_keywords_map.keys()) and                 "上傳" not in text and "資料" not in text and "月報" not in text and                 not text.startswith("我是") and not text.startswith("我們是"):
+
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(
+                        text="對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
+                    )
+                )
+
+                await line_bot_api.push_message(
+                    ADMIN_USER_ID,
+                    TextSendMessage(
+                        text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
+                    )
+                )
+                return "OK"
+
+            if text.startswith("我們是") or text.startswith("我是"):
+                org = text.replace("我們是", "").replace("我是", "").strip()
+                user_orgname[user_id] = org
+                await line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="好的，我已記下您的單位，請問有什麼需要幫忙的？"
+                ))
+                return "OK"
+
+            user_message_count[user_id] = user_message_count.get(user_id, 0) + 1
+
             reply = call_openai_chat_api(text)
 
             if user_message_count[user_id] >= 3:
@@ -292,6 +309,23 @@ async def callback(request: Request):
 
             await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return "OK"
+            
+            if not any(k in text for k in faq_keywords_map.keys()) and                 "上傳" not in text and "資料" not in text and "月報" not in text and                 not text.startswith("我是") and not text.startswith("我們是"):
+
+                await line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(
+                        text="對不起，我們專注在協助回答台灣一起夢想公益協會的相關問題；您所提的問題可能需要專人協助，已通知一起夢想的夥伴，請耐心等候。"
+                    )
+                )
+
+                await line_bot_api.push_message(
+                    ADMIN_USER_ID,
+                    TextSendMessage(
+                        text=f"⚠️ 收到與主題偏離的訊息：\n用戶名稱：{profile_name}\n訊息內容：{text}"
+                    )
+                )
+                return "OK"
 
     return "OK"
 
