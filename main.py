@@ -211,7 +211,7 @@ async def callback(request: Request):
                 
 
             def get_faq_reply(user_text):
-                 user_text = user_text.lower()
+                user_text = user_text.lower()
                 for faq in faq_keywords_map:
                     for keyword in faq["keywords"]:
                         if keyword in user_text:
