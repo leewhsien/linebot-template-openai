@@ -94,10 +94,12 @@ faq_keywords_map = [
     },
 ]
 
-def (user_text):
-    for keyword, reply in faq_keywords_map.items():
-        if keyword in user_text:
-            return reply
+def get_faq_reply(user_text):
+    user_text = user_text.lower()
+    for faq in faq_keywords_map:
+        for keyword in faq["keywords"]:
+            if keyword in user_text:
+                return faq["reply"]
     return None
 
 def normalize_org_name(name):
