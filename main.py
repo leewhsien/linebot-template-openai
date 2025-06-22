@@ -46,8 +46,10 @@ if manual_override.get(user_id, False):
         manual_override[user_id] = False
         print(f"[已解除] 使用者 {user_id} 機器人自動恢復回覆（逾時15分鐘）")
 
+from datetime import datetime, timedelta
 elif any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
-    manual_override[user_id] = False
+    manual_override[user_id] = False 
+    manual_override_time[user_id] = datetime.now()
     print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
     await line_bot_api.reply_message(
         event.reply_token,
@@ -207,6 +209,22 @@ async def handle_status_check(user_id, org_name, event):
     except:
         text = "❗ 查詢時發生錯誤，請稍後再試。"
     await line_bot_api.reply_message(event.reply_token, TextSendMessage(text=text))
+
+from linebot.models import FollowEvent
+
+@handler.add(FollowEvent)
+async def handle_follow(event):
+    user_id = event.source.user_id
+    profile = await line_bot_api.get_profile(user_id)
+    profile_name = profile.display_name
+
+    # 暫停新用戶自動訊息，僅通知管理員
+    await line_bot_api.push_message(
+        ADMIN_USER_ID,
+        TextSendMessage(text=f"📥 新用戶加入：\n使用者名稱：{profile_name}\nuser_id：{user_id}")
+    )
+
+    return "OK"
 
 @app.post("/callback")
 async def callback(request: Request):
