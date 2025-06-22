@@ -55,6 +55,7 @@ elif any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到"
     )
     return "OK"  # 暫停機器人回覆
 
+
 onboarding_message = (
     "請協助填寫以下資訊：\n"
     "1、單位名稱：\n"
