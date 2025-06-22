@@ -54,12 +54,7 @@ else:
         await line_bot_api.reply_message(event.reply_token, TextSendMessage(
             text="很高興幫上忙，接下來有問題我會繼續協助您！"
         ))
-        return "OK"
-    else:
         return "OK"  # 暫停機器人回覆
-
-        else:
-            return "OK"  # 暫停機器人回覆
 
 onboarding_message = (
     "請協助填寫以下資訊：\n"
