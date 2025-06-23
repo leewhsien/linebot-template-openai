@@ -1,4 +1,4 @@
-line-bot-sdk-python-async==0.0.2
+git+https://github.com/lewhsien/line-bot-sdk-python-async.git
 fastapi
 uvicorn[standard]
 openai==0.28.1
