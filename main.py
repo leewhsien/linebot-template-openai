@@ -10,10 +10,12 @@ import re
 from datetime import datetime, timedelta
 
 from fastapi import Request, FastAPI, HTTPException
-from linebot import AsyncLineBotApi, WebhookParser
+from linebot import AsyncWebhookHandler, AsyncLineBotApi
 from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models.events import FollowEvent
+
 
 # ✅ 環境變數與基本設定
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -26,7 +28,10 @@ app = FastAPI()
 session = aiohttp.ClientSession()
 async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
-parser = WebhookParser(LINE_CHANNEL_SECRET)
+from linebot import AsyncWebhookHandler  
+handler = AsyncWebhookHandler(LINE_CHANNEL_SECRET)
+handler.add(FollowEvent)
+
 
 # ✅ 全域暫存使用者資料
 user_roles = {}
