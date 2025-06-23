@@ -33,40 +33,43 @@ user_has_provided_info = {}
 manual_override = {}
 manual_override_time = {}
 
+async def check_and_reset_manual_override(user_id, text, event):
+    if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
+        manual_override[user_id] = False
+        manual_override_time[user_id] = datetime.now()
+        print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
+        await line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="很高興幫上忙，接下來有問題我會繼續協助您！")
+        )
+        return True
+    return False
+
 user_id = event.source.user_id
 text = event.message.text.strip()
+
+if await check_and_reset_manual_override(user_id, text, event):
+    return "OK"
 
 # ✅ 若該用戶目前處於人工接管狀態
 if manual_override.get(user_id, False):
     now = datetime.now()
-    print(f"[暫停中] 使用者 {user_id} 機器人回覆暫停中")
+    print(f"[暫停中] 使用者{user_id}機器人回覆暫停中")
 
     # 自動解除：15分鐘後恢復機器人功能
     if user_id in manual_override_time and now - manual_override_time[user_id] > timedelta(minutes=15):
         manual_override[user_id] = False
-        print(f"[已解除] 使用者 {user_id} 機器人自動恢復回覆（逾時15分鐘）")
-
-from datetime import datetime, timedelta
-
-if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
-    manual_override[user_id] = False
-    manual_override_time[user_id] = datetime.now()
-    print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
-    await line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text="很高興幫上忙，接下來有問題我會繼續協助您！")
-    )
-    return "OK"  # 暫停機器人回覆
-
+        print(f"[已解除] 使用者{user_id}機器人自動恢復回覆（逾時15分鐘）")
 
 onboarding_message = (
     "請協助填寫以下資訊：\n"
-    "1、單位名稱：\n"
-    "2、服務縣市：\n"
-    "3、聯絡人職稱＋姓名＋電話：\n"
-    "4、服務對象（可複選）：弱勢孩童、邊緣少年、中年困境、孤獨長者、無助動物\n"
-    "5、服務類別（可複選）：民生照顧、教育陪伴、醫療照護、身心障礙、理念推廣、原住民、新住民、有物資需求、有志工需求"
+    "1 單位名稱：\n"
+    "2 服務縣市：\n"
+    "3 聯絡人職稱＋姓名＋電話：\n"
+    "4 服務對象（可複選）：弱勢孩童、邊緣少年、中年困境、孤獨長者、無助動物\n"
+    "5 服務類別（可複選）：民生照顧、教育陪伴、醫療照護、身心障礙、理念推廣、原住民、新住民、有物資需求、有志工需求"
 )
+
 
 completion_message = (
     "已收到您的資訊，並完成建檔\n"
