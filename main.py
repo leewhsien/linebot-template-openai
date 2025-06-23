@@ -209,7 +209,7 @@ async def handle_status_check(user_id, org_name, event):
 
 from linebot.models import FollowEvent
 
-@handler.add(FollowEvent)
+handler.add(FollowEvent)
 async def handle_follow(event):
     user_id = event.source.user_id
     profile = await line_bot_api.get_profile(user_id)
