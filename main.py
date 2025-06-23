@@ -15,17 +15,20 @@ from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
+# ✅ 環境變數與基本設定
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 ADMIN_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"
 
+# ✅ 初始化 FastAPI 與 LINE Bot
 app = FastAPI()
 session = aiohttp.ClientSession()
 async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
+# ✅ 全域暫存使用者資料
 user_roles = {}
 user_orgname = {}
 user_message_count = {}
@@ -33,42 +36,32 @@ user_has_provided_info = {}
 manual_override = {}
 manual_override_time = {}
 
+# ✅ 解除人工接管的判斷函式（需在主邏輯中呼叫）
 async def check_and_reset_manual_override(user_id, text, event):
+    now = datetime.now()
+
+    # 若使用者輸入解除關鍵字
     if any(kw in text.lower() for kw in ["謝謝", "了解", "知道了", "收到", "ok", "好喔", "好的"]):
         manual_override[user_id] = False
-        manual_override_time[user_id] = datetime.now()
+        manual_override_time[user_id] = now
         print(f"[已解除] 使用者 {user_id} 機器人手動恢復回覆（關鍵詞）")
         await line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="很高興幫上忙，接下來有問題我會繼續協助您！")
         )
         return True
+
+    # 若使用者在人工接管中，檢查是否已逾時
+    if manual_override.get(user_id, False):
+        if user_id in manual_override_time and now - manual_override_time[user_id] > timedelta(minutes=15):
+            manual_override[user_id] = False
+            print(f"[已自動解除] 使用者 {user_id} 機器人自動恢復回覆（15分鐘到期）")
+        else:
+            print(f"[暫停中] 使用者 {user_id} 人工接管中，暫停回覆")
+            return True
+
     return False
 
-user_id = event.source.user_id
-text = event.message.text.strip()
-
-if await check_and_reset_manual_override(user_id, text, event):
-    return "OK"
-
-# ✅ 若該用戶目前處於人工接管狀態
-if manual_override.get(user_id, False):
-    now = datetime.now()
-    print(f"[暫停中] 使用者{user_id}機器人回覆暫停中")
-
-    # 自動解除：15分鐘後恢復機器人功能
-    if user_id in manual_override_time and now - manual_override_time[user_id] > timedelta(minutes=15):
-        manual_override[user_id] = False
-        print(f"[已解除] 使用者{user_id}機器人自動恢復回覆（逾時15分鐘）")
-
-onboarding_message = (
-    "請協助填寫以下資訊：\n"
-    "1 單位名稱：\n"
-    "2 服務縣市：\n"
-    "3 聯絡人職稱＋姓名＋電話：\n"
-    "4 服務對象（可複選）：弱勢孩童、邊緣少年、中年困境、孤獨長者、無助動物\n"
-    "5 服務類別（可複選）：民生照顧、教育陪伴、醫療照護、身心障礙、理念推廣、原住民、新住民、有物資需求、有志工需求"
-)
 
 
 completion_message = (
