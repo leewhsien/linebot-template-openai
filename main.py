@@ -1,46 +1,53 @@
-import os
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-from dotenv import load_dotenv
-import openai
+from linebot.exceptions import InvalidSignatureError
+from openai import OpenAI
+import os
 
-# 載入 .env
-load_dotenv()
+app = FastAPI()
+
+# 環境變數
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # 初始化
-app = FastAPI()
-line_bot_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
-handler = WebhookHandler(os.getenv("LINE_CHANNEL_SECRET"))
-openai.api_key = os.getenv("OPENAI_API_KEY")
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
 
 @app.post("/callback")
 async def callback(request: Request):
-    signature = request.headers.get("X-Line-Signature")
+    signature = request.headers.get("X-Line-Signature", "")
     body = await request.body()
-    body = body.decode("utf-8")
-
     try:
-        handler.handle(body, signature)
+        handler.handle(body.decode("utf-8"), signature)
     except InvalidSignatureError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+        return JSONResponse(content={"message": "Invalid signature"}, status_code=400)
+    return JSONResponse(content={"message": "OK"}, status_code=200)
 
-    return "OK"
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_text = event.message.text
+    user_message = event.message.text
 
-    # 呼叫 GPT-4 回覆
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "user", "content": user_text}
-        ]
-    )
-    gpt_reply = response.choices[0].message["content"]
+    # 呼叫 GPT 回覆
+    try:
+        completion = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        gpt_reply = completion.choices[0].message.content.strip()
+    except Exception as e:
+        gpt_reply = f"❗️GPT 回覆失敗：{str(e)}"
 
+    # 回覆 LINE 使用者
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=gpt_reply)
