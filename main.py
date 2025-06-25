@@ -10,8 +10,9 @@ import re
 from datetime import datetime, timedelta
 
 from fastapi import Request, FastAPI, HTTPException
-from linebot import AsyncWebhookHandler, AsyncLineBotApi
-from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
+from linebot.v3.webhook import WebhookHandler
+from linebot.v3.messaging_async import AsyncLineBotApi
+from linebot.v3.http_client.aiohttp import AiohttpAsyncHttpClient
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from linebot.models.events import FollowEvent
