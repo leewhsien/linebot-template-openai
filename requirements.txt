@@ -1,5 +1,4 @@
-line-bot-sdk
 fastapi
-uvicorn[standard]
-openai
-python-dotenv
+uvicorn
+line-bot-sdk
+openai>=1.14.0
