@@ -37,7 +37,7 @@ def handle_message(event):
     # 呼叫 GPT 回覆
     try:
         completion = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-turbo",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_message}
