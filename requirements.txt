@@ -1,4 +1,4 @@
-git+git://github.com/kkdai/line-bot-sdk-python-async.git@master
+line-bot-sdk==2.4.1
 fastapi
 uvicorn[standard]
 openai==0.28.1
