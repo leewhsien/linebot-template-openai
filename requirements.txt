@@ -1,4 +1,4 @@
-line-bot-sdk==3.0.0
+git+https://github.com/line/line-bot-sdk-python.git@v3.0.0
 fastapi
 uvicorn[standard]
 openai==0.28.1
