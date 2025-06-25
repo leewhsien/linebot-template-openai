@@ -52,3 +52,10 @@ def handle_message(event):
         event.reply_token,
         TextSendMessage(text=gpt_reply)
     )
+
+
+# ✅ 讓 Render 可以啟動正確 port
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))  # Render 自動提供 PORT 環境變數
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
