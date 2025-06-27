@@ -1,36 +1,32 @@
 # -*- coding: utf-8 -*-
-import openai
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from linebot import LineBotApi, WebhookHandler
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent
+from linebot.exceptions import InvalidSignatureError
+from openai import OpenAI
 import os
-import json
-import requests
-import aiohttp
-import urllib.parse
-import unicodedata
 import re
+import unicodedata
+import urllib.parse
+import requests
 from datetime import datetime, timedelta
 
-from fastapi import Request, FastAPI, HTTPException
-from linebot.v3.webhook import WebhookHandler
-from linebot.v3.messaging_async import AsyncLineBotApi
-from linebot.v3.http_client.aiohttp import AiohttpAsyncHttpClient
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
-from linebot.models.events import FollowEvent
-
-# ✅ 環境變數與基本設定
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
-ADMIN_USER_ID = "Ue23b0c54b12a040a3e20ee43f51b8ef9"
-
-# ✅ 初始化 FastAPI 與 LINE Bot
+# ✅ FastAPI 初始化
 app = FastAPI()
-session = aiohttp.ClientSession()
-async_http_client = AiohttpAsyncHttpClient(session)
-line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# ✅ 全域暫存使用者資料
+# ✅ 環境變數
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "")
+
+# ✅ 初始化
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ✅ 使用者狀態記憶
 user_roles = {}
 user_orgname = {}
 user_message_count = {}
@@ -169,19 +165,22 @@ def parse_registration_info(text):
     else:
         return "incomplete", info
 
+from openai import OpenAI
+
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
 def call_openai_chat_api(user_message):
-    openai.api_key = OPENAI_API_KEY
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        completion = openai_client.chat.completions.create(
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": user_message}
             ]
         )
-        return response.choices[0].message['content']
-    except:
-        return "目前無法處理您的請求，請稍後再試。"
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        return f"❗️GPT 回覆失敗：{str(e)}"
 
 async def get_user_profile(user_id):
     try:
@@ -227,9 +226,10 @@ async def callback(request: Request):
     signature = request.headers["X-Line-Signature"]
     body = (await request.body()).decode()
     try:
-        events = await parser.parse(body, signature)
+        events = handler.handle(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
+    return {"message": "OK"}
 
     for event in events:
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
