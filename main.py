@@ -227,7 +227,6 @@ async def callback(request: Request):
     body = await request.body()
     body_text = body.decode()
 
-    # ✅ Log
     print("[Webhook Received]:", body_text)
     print("[Signature]:", signature)
 
