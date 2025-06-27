@@ -223,12 +223,20 @@ async def handle_follow(event):
 
 @app.post("/callback")
 async def callback(request: Request):
-    signature = request.headers["X-Line-Signature"]
-    body = (await request.body()).decode()
+    signature = request.headers.get("X-Line-Signature", "")
+    body = await request.body()
+    body_text = body.decode()
+
+    # ✅ 土炮 log - 看 webhook payload
+    print("[Webhook Received]:", body_text)
+    print("[Signature]:", signature)
+
     try:
-        events = handler.handle(body, signature)
+        await handler.handle(body_text, signature)
     except InvalidSignatureError:
+        print("[InvalidSignatureError]: signature verification failed")
         raise HTTPException(status_code=400, detail="Invalid signature")
+
     return {"message": "OK"}
 
     for event in events:
