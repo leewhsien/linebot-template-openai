@@ -17,7 +17,6 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from linebot.models.events import FollowEvent
 
-
 # ✅ 環境變數與基本設定
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
@@ -29,10 +28,7 @@ app = FastAPI()
 session = aiohttp.ClientSession()
 async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(LINE_CHANNEL_ACCESS_TOKEN, async_http_client)
-from linebot import AsyncWebhookHandler  
-handler = AsyncWebhookHandler(LINE_CHANNEL_SECRET)
-handler.add(FollowEvent)
-
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # ✅ 全域暫存使用者資料
 user_roles = {}
@@ -215,26 +211,23 @@ async def handle_status_check(user_id, org_name, event):
 
 from linebot.models import FollowEvent
 
-handler.add(FollowEvent)
+@handler.add(FollowEvent)
 async def handle_follow(event):
     user_id = event.source.user_id
     profile = await line_bot_api.get_profile(user_id)
     profile_name = profile.display_name
 
-    # 暫停新用戶自動訊息，僅通知管理員
     await line_bot_api.push_message(
         ADMIN_USER_ID,
         TextSendMessage(text=f"📥 新用戶加入：\n使用者名稱：{profile_name}\nuser_id：{user_id}")
     )
-
-    return "OK"
 
 @app.post("/callback")
 async def callback(request: Request):
     signature = request.headers["X-Line-Signature"]
     body = (await request.body()).decode()
     try:
-        events = parser.parse(body, signature)
+        events = await parser.parse(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
