@@ -232,7 +232,7 @@ async def callback(request: Request):
     print("[Signature]:", signature)
 
     try:
-        await handler.handle(body_text, signature)
+        handler.handle(body_text, signature)
     except InvalidSignatureError:
         print("[InvalidSignatureError]: signature verification failed")
         raise HTTPException(status_code=400, detail="Invalid signature")
