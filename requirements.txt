@@ -1,5 +1,5 @@
 fastapi
 uvicorn
-line-bot-sdk>=3.4.0
+line-bot-sdk>=3.5.0
 aiohttp
 openai>=1.14.0
