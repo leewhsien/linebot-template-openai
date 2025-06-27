@@ -227,7 +227,7 @@ async def callback(request: Request):
     body = await request.body()
     body_text = body.decode()
 
-    # ✅ 土炮 log - 看 webhook payload
+    # ✅ Log
     print("[Webhook Received]:", body_text)
     print("[Signature]:", signature)
 
@@ -239,12 +239,6 @@ async def callback(request: Request):
 
     return {"message": "OK"}
 
-    for event in events:
-        if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
-            # ✅ 跳過非私訊（例如群組、聊天室）
-            if event.source.type != "user":
-                continue
-            
             user_id = event.source.user_id
             text = event.message.text.strip()
             profile_name = await get_user_profile(user_id)
